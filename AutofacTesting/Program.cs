@@ -1,6 +1,7 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using Autofac;
+using Autofac.Core;
 
 namespace AutofacTesting;
 
@@ -27,20 +28,45 @@ public class EmailLog : ILog
     }
 }
 
+public class SMSLog : ILog
+{
+    private string phoneNumber;
+
+    public SMSLog(string phoneNumber)
+    {
+        this.phoneNumber = phoneNumber;
+    }
+    public void Write(string message)
+    {
+        Console.WriteLine($"SMS to {phoneNumber} : {message}");
+    }
+}
+
 public class Engine
 {
     private ILog log;
     private int id;
+    private int speed;
 
-    public Engine(ILog log)
+    // Factory that returns object
+    public delegate Engine Factory(int value);
+    
+    public Engine(ILog log, int value)
     {
         this.log = log;
+        this.speed = value;
         id = new Random().Next();
+        
     }
 
     public void Ahead(int power)
     {
         log.Write($"Engine [{id}] ahead {power}");
+    }
+
+    public void CheckSpeed()
+    {
+        log.Write($"Car is moving at speed {speed}");
     }
 }
 
@@ -73,35 +99,39 @@ internal class Program
     public static void Main(string[] args)
     {
         var builder = new ContainerBuilder();
-        builder.RegisterType<ConsoleLog>().As<ILog>();
         
-        // Register a second Type
-        // builder.RegisterType<EmailLog>().As<ILog>().PreserveExistingDefaults();
+        // Named parameters
+//        builder.RegisterType<SMSLog>().As<ILog>()
+//          .WithParameter("phoneNumber", "123-456-7890");
+        
+        // Typed parameter
+//        builder.RegisterType<SMSLog>().As<ILog>()
+//            .WithParameter(new TypedParameter(typeof(string), "123-456-7890"));
+        
+        // Resolved parameter
+//        builder.RegisterType<SMSLog>().As<ILog>()
+//            .WithParameter(
+//                new ResolvedParameter(
+//                    // Predicate
+//                    (pi, ctx) => 
+//                        pi.ParameterType == typeof(string) && pi.Name == "phoneNumber",
+//                    //Value accessor
+//                    (pi,ctx) => "123-456-7890"
+//                    )
+//                );
 
-        // Would use this particular instance of ConsoleLog
-        // var log = new ConsoleLog();
-        // builder.RegisterInstance(log).As<ILog>();
-        
-        //Register with lambda to specify other components to use
-        builder.Register((c) => new Engine(c.Resolve<ILog>()));
-        builder.RegisterType<Engine>();
-        
-        // Register Type and specify constructor
-        //builder.RegisterType<Car>().UsingConstructor(typeof(Engine));
+        // Factory process
         builder.RegisterType<Car>();
+        builder.RegisterType<Engine>();
+        builder.RegisterType<ConsoleLog>().As<ILog>();
+        var container = builder.Build();
         
-        //Generics
-        builder.RegisterGeneric(typeof(List<>)).As(typeof(IList<>));
-        
-        
-        IContainer container = builder.Build();
+        var engineWithValueParameter = container.Resolve<Engine.Factory>();
+        var engineWithVal10 = engineWithValueParameter(10);
+        engineWithVal10.CheckSpeed();
 
-        var car = container.Resolve<Car>();
-        
-        //Generics example for setting list to concrete type of string
-        var myList = container.Resolve<IList<string>>();
-        Console.WriteLine(myList.GetType());
+        var engineWithVal20 = engineWithValueParameter(20);
+        engineWithVal20.CheckSpeed();
 
-        car.Go();
     }
 }
